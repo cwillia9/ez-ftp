@@ -1,6 +1,6 @@
 package config
 
-// T is a config struct
+// T is the basic config struct
 type T struct {
 	// Root for ftp to serve files from
 	RootDir string

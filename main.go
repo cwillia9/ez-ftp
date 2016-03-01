@@ -49,6 +49,6 @@ func main() {
 	log.Println("Successfully init'd database")
 
 	http.HandleFunc("/dl/", downloadHandler)
-	http.HandleFunc("/ul/", uploadHandler)
+	http.HandleFunc("/ul/", hmacAuthentication(uploadHandler))
 	log.Fatal(http.ListenAndServe(":9999", nil))
 }
