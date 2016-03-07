@@ -9,6 +9,7 @@ import (
 
 	"github.com/cwillia9/ez-ftp/config"
 	"github.com/cwillia9/ez-ftp/datastore"
+	"github.com/cwillia9/ez-ftp/localfs"
 )
 
 const (
@@ -47,6 +48,8 @@ func main() {
 		os.Exit(1)
 	}
 	log.Println("Successfully init'd database")
+
+	system := localfs.New(cfg)
 
 	http.HandleFunc("/dl/", downloadHandler)
 	http.HandleFunc("/ul/", hmacAuthentication(uploadHandler))

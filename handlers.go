@@ -2,8 +2,6 @@ package main
 
 import (
 	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cwillia9/eq-ftp/domain"
+	"github.com/cwillia9/ez-ftp/authentication"
 	"github.com/cwillia9/ez-ftp/datastore"
 )
 
@@ -64,11 +64,9 @@ func hmacAuthentication(fn func(w http.ResponseWriter, r *http.Request)) http.Ha
 			return
 		}
 
-		mac := hmac.New(sha256.New, []byte(passhash))
-		mac.Write([]byte(key))
-		expectedEncoding := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+		expectation := authentication.ComputeHmac1(key, passhash)
 
-		if match := hmac.Equal([]byte(actualEncoding), []byte(expectedEncoding)); match == false {
+		if match := hmac.Equal([]byte(actualEncoding), []byte(expectation)); match == false {
 			http.Error(w, "Authorization didn't match", http.StatusUnauthorized)
 			log.Println("upload rejected: supplied mac encoding did not match expected for user " + key)
 			return
@@ -79,7 +77,7 @@ func hmacAuthentication(fn func(w http.ResponseWriter, r *http.Request)) http.Ha
 	}
 }
 
-func downloadHandler(w http.ResponseWriter, r *http.Request) {
+func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
 	if r.Method != "GET" {
 		http.Error(w, "Only GET requests accepted on dl", http.StatusMethodNotAllowed)
 		return
@@ -94,13 +92,14 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Record doesn't exist for uuid: "+uuid)
 		return
 	}
+
 	log.Println("Serving file: " + fname)
 	_, file := filepath.Split(fname)
 	w.Header().Set("Content-Disposition", "attachment; filename="+file)
 	http.ServeFile(w, r, fname)
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
+func uploadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
 	// Must be using a POST/PUT method
 	if r.Method != "POST" && r.Method != "PUT" {
 		http.Error(w, "Only POST requests accepted on /ul/", http.StatusMethodNotAllowed)
@@ -116,10 +115,29 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// TODO(cwilliams): We want the file path to be a part of the POST body, we dont
-	// want all of the files just dumped into a flat root dir. Eventually we want to expose
+	// TODO(cwilliams): Eventually we want to expose
 	// some kind of admin api to view directory structure
-	newfile := path.Join(cfg.RootDir, handler.Filename)
+
+	// Note: the call to FormFile above would already have parsed the form
+	desiredPaths, ok := r.MultipartForm.Value["path"]
+	if ok != true {
+		log.Println("No path specified")
+		http.Error(w, "expected path", http.StatusExpectationFailed)
+		return
+	}
+
+	// We only support a single path
+	desiredPath := desiredPaths[0]
+	fmt.Println("desiredpath", desiredPath)
+
+	newfile := path.Join(cfg.RootDir, desiredPath, handler.Filename)
+
+	if err = os.MkdirAll(path.Join(cfg.RootDir, desiredPath), 0777); err != nil {
+		http.Error(w, "path failure", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
 	// O_EXCL ensures that if the file already exists we will not overwrite it
 	f, err := os.OpenFile(newfile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
@@ -144,7 +162,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Successfully wrote file to: " + path.Join(cfg.RootDir, handler.Filename))
 
-	randID := randomString(30)
+	randID := randomString(32)
 	err = datastore.InsertFile(randID, cfg.RootDir, handler.Filename)
 	// TODO(cwilliams): Did we fail because the entry is already there?
 	if err != nil {

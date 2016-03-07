@@ -20,3 +20,8 @@ func Default() *T {
 
 	return config
 }
+
+// GetRootDir is a getter for the RootDIr
+func (t *T) GetRootDir() string {
+	return t.RootDir
+}
