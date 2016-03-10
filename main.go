@@ -49,7 +49,10 @@ func main() {
 	}
 	log.Println("Successfully init'd database")
 
-	system := localfs.New(cfg)
+	system, err := localfs.New(cfg)
+	if err != nil {
+		log.Println("Failed instantiating file system")
+	}
 
 	http.HandleFunc("/dl/", downloadHandler)
 	http.HandleFunc("/ul/", hmacAuthentication(uploadHandler))

@@ -93,7 +93,8 @@ func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileS
 		return
 	}
 
-	log.Println("Serving file: " + fname)
+	system.
+		log.Println("Serving file: " + fname)
 	_, file := filepath.Split(fname)
 	w.Header().Set("Content-Disposition", "attachment; filename="+file)
 	http.ServeFile(w, r, fname)
