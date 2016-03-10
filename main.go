@@ -9,6 +9,7 @@ import (
 
 	"github.com/cwillia9/ez-ftp/config"
 	"github.com/cwillia9/ez-ftp/datastore"
+	"github.com/cwillia9/ez-ftp/domain"
 	"github.com/cwillia9/ez-ftp/localfs"
 )
 
@@ -21,6 +22,10 @@ var (
 	cfg     *config.T
 	rootDir string
 )
+
+type Server struct {
+	fs domain.FileSystem
+}
 
 func init() {
 	cfg = &config.T{}
@@ -49,12 +54,12 @@ func main() {
 	}
 	log.Println("Successfully init'd database")
 
-	system, err := localfs.New(cfg)
+	fs, err := localfs.New(cfg)
 	if err != nil {
 		log.Println("Failed instantiating file system")
 	}
 
-	http.HandleFunc("/dl/", downloadHandler)
-	http.HandleFunc("/ul/", hmacAuthentication(uploadHandler))
+	//http.HandleFunc("/dl/", downloadHandler)
+	http.HandleFunc("/ul/", hmacAuthentication(makeFsHandler(uploadHandler, fs)))
 	log.Fatal(http.ListenAndServe(":9999", nil))
 }

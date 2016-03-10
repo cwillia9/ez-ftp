@@ -1,11 +1,13 @@
 package localfs
 
+import (
+	"os"
+	"path/filepath"
+)
+
 // T holds the local file system struct
 type T struct {
 	rootDir string
-}
-
-type LocalFile struct {
 }
 
 // Config config expectation
@@ -20,18 +22,11 @@ func New(cfg Config) (*T, error) {
 	return localfs, nil
 }
 
-func (f *LocalFile) Close() error {
-	return nil
+// Opens file on local file system. The path given will be relative
+// to the rootDir
+func (t *T) Open(name string, flags int) (*os.File, error) {
+	// TODO(cwilliams): It's a security concern to not check if
+	// name has any '..' in it
+	file, err := os.OpenFile(filepath.Join(t.rootDir, name), flags, 0755)
+	return file, err
 }
-
-func (f *LocalFile) Read(p []byte) (int, error) {
-	return 0, nil
-}
-
-func (f *LocalFile) Seek(offset int64, whence int) (int64, error) {
-	return 0, nil
-}
-
-func (f *LocalFile) Stat()
-
-func (t *T) Open(path string)

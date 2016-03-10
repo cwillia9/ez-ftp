@@ -9,13 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/cwillia9/eq-ftp/domain"
 	"github.com/cwillia9/ez-ftp/authentication"
 	"github.com/cwillia9/ez-ftp/datastore"
+	"github.com/cwillia9/ez-ftp/domain"
 )
 
 /*
@@ -77,30 +76,30 @@ func hmacAuthentication(fn func(w http.ResponseWriter, r *http.Request)) http.Ha
 	}
 }
 
-func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
-	if r.Method != "GET" {
-		http.Error(w, "Only GET requests accepted on dl", http.StatusMethodNotAllowed)
-		return
-	}
+// func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
+// 	if r.Method != "GET" {
+// 		http.Error(w, "Only GET requests accepted on dl", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-	splt := strings.Split(r.URL.Path, "/")
-	uuid := splt[len(splt)-1]
+// 	splt := strings.Split(r.URL.Path, "/")
+// 	uuid := splt[len(splt)-1]
 
-	fname, err := datastore.SelectFile(uuid)
-	if err != nil {
-		// TODO(cwilliams): Doesn't exist or did we get a db err?
-		fmt.Fprintf(w, "Record doesn't exist for uuid: "+uuid)
-		return
-	}
+// 	fname, err := datastore.SelectFile(uuid)
+// 	if err != nil {
+// 		// TODO(cwilliams): Doesn't exist or did we get a db err?
+// 		fmt.Fprintf(w, "Record doesn't exist for uuid: "+uuid)
+// 		return
+// 	}
 
-	system.
-		log.Println("Serving file: " + fname)
-	_, file := filepath.Split(fname)
-	w.Header().Set("Content-Disposition", "attachment; filename="+file)
-	http.ServeFile(w, r, fname)
-}
+// 	system.
+// 		log.Println("Serving file: " + fname)
+// 	_, file := filepath.Split(fname)
+// 	w.Header().Set("Content-Disposition", "attachment; filename="+file)
+// 	http.ServeFile(w, r, fname)
+// }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
+func uploadHandler(w http.ResponseWriter, r *http.Request, fs domain.FileSystem) {
 	// Must be using a POST/PUT method
 	if r.Method != "POST" && r.Method != "PUT" {
 		http.Error(w, "Only POST requests accepted on /ul/", http.StatusMethodNotAllowed)
@@ -140,7 +139,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSys
 	}
 
 	// O_EXCL ensures that if the file already exists we will not overwrite it
-	f, err := os.OpenFile(newfile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+	f, err := fs.Open(newfile, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
 	if err != nil {
 		if os.IsExist(err) {
 			// TODO(cwilliams): Add 'overwrite' flag functionality
@@ -172,6 +171,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSys
 	}
 	log.Printf("Successfully stored new file %s/%s\n", cfg.RootDir, handler.Filename)
 	fmt.Fprint(w, "new uuid: "+randID)
+}
+
+func makeFsHandler(fn func(http.ResponseWriter, *http.Request, domain.FileSystem), fs domain.FileSystem) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fn(w, r, fs)
+	}
 }
 
 func randomString(strlen int) string {
