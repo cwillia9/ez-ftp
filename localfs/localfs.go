@@ -27,6 +27,7 @@ func New(cfg Config) (*T, error) {
 func (t *T) Open(name string, flags int) (*os.File, error) {
 	// TODO(cwilliams): It's a security concern to not check if
 	// name has any '..' in it
-	file, err := os.OpenFile(filepath.Join(t.rootDir, name), flags, 0755)
+	path := filepath.Join(t.rootDir, name)
+	file, err := os.OpenFile(path, flags, 0755)
 	return file, err
 }

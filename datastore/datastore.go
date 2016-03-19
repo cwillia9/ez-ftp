@@ -3,7 +3,6 @@ package datastore
 import (
 	"database/sql"
 	"log"
-	pathlib "path"
 
 	// Set up to only use sqlite
 	_ "github.com/mattn/go-sqlite3"
@@ -63,14 +62,14 @@ func InsertFile(id, root, path string) error {
 }
 
 // SelectFile path from id
-func SelectFile(id string) (string, error) {
+func SelectFile(id string) (string, string, error) {
 	var rootdir, path string
 	err := db.QueryRow(
 		"SELECT rootdir, path FROM pathmappings where randstring = ?;", id).Scan(&rootdir, &path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return pathlib.Join(rootdir, path), nil
+	return rootdir, path, nil
 }
 
 // SelectUser from db

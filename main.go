@@ -59,7 +59,7 @@ func main() {
 		log.Println("Failed instantiating file system")
 	}
 
-	//http.HandleFunc("/dl/", downloadHandler)
+	http.HandleFunc("/dl/", makeFsHandler(downloadHandler, fs))
 	http.HandleFunc("/ul/", hmacAuthentication(makeFsHandler(uploadHandler, fs)))
 	log.Fatal(http.ListenAndServe(":9999", nil))
 }

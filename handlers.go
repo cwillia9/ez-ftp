@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -76,28 +77,42 @@ func hmacAuthentication(fn func(w http.ResponseWriter, r *http.Request)) http.Ha
 	}
 }
 
-// func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
-// 	if r.Method != "GET" {
-// 		http.Error(w, "Only GET requests accepted on dl", http.StatusMethodNotAllowed)
-// 		return
-// 	}
+func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileSystem) {
+	if r.Method != "GET" {
+		http.Error(w, "Only GET requests accepted on dl", http.StatusMethodNotAllowed)
+		return
+	}
 
-// 	splt := strings.Split(r.URL.Path, "/")
-// 	uuid := splt[len(splt)-1]
+	splt := strings.Split(r.URL.Path, "/")
+	uuid := splt[len(splt)-1]
 
-// 	fname, err := datastore.SelectFile(uuid)
-// 	if err != nil {
-// 		// TODO(cwilliams): Doesn't exist or did we get a db err?
-// 		fmt.Fprintf(w, "Record doesn't exist for uuid: "+uuid)
-// 		return
-// 	}
+	rootDir, path, err := datastore.SelectFile(uuid)
+	if err != nil {
+		// TODO(cwilliams): Doesn't exist or did we get a db err?
+		fmt.Fprintf(w, "Record doesn't exist for uuid: "+uuid)
+		http.Error(w, "Invalid request", http.StatusNotFound)
+		return
+	}
 
-// 	system.
-// 		log.Println("Serving file: " + fname)
-// 	_, file := filepath.Split(fname)
-// 	w.Header().Set("Content-Disposition", "attachment; filename="+file)
-// 	http.ServeFile(w, r, fname)
-// }
+	if rootDir != cfg.RootDir {
+		log.Println("Attempting to download from from wrong root dir. Attempted", rootDir, "but running", cfg.RootDir)
+		http.Error(w, "Invalid request", http.StatusNotFound)
+		return
+	}
+
+	f, err := system.Open(path, os.O_RDONLY)
+	if err != nil {
+		log.Println("Error opening file", err)
+		http.Error(w, "Error retreiving file", http.StatusInternalServerError)
+		return
+	}
+	f.Close()
+
+	log.Println("Serving file: " + path)
+	_, file := filepath.Split(path)
+	w.Header().Set("Content-Disposition", "attachment; filename="+file)
+	http.ServeFile(w, r, f.Name())
+}
 
 func uploadHandler(w http.ResponseWriter, r *http.Request, fs domain.FileSystem) {
 	// Must be using a POST/PUT method
@@ -130,7 +145,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request, fs domain.FileSystem)
 	desiredPath := desiredPaths[0]
 	fmt.Println("desiredpath", desiredPath)
 
-	newfile := path.Join(cfg.RootDir, desiredPath, handler.Filename)
+	newfile := path.Join(desiredPath, handler.Filename)
 
 	if err = os.MkdirAll(path.Join(cfg.RootDir, desiredPath), 0777); err != nil {
 		http.Error(w, "path failure", http.StatusInternalServerError)
@@ -163,8 +178,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request, fs domain.FileSystem)
 	log.Println("Successfully wrote file to: " + path.Join(cfg.RootDir, handler.Filename))
 
 	randID := randomString(32)
-	err = datastore.InsertFile(randID, cfg.RootDir, handler.Filename)
+	err = datastore.InsertFile(randID, cfg.RootDir, path.Join(desiredPath, handler.Filename))
 	// TODO(cwilliams): Did we fail because the entry is already there?
+	// TODO(cwilliams): Did we fail beause the random string already exists? If so we should try again
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Try again soon", http.StatusInternalServerError)
