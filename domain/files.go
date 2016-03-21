@@ -10,13 +10,10 @@ type FileRepository interface {
 	Store(File) error
 }
 
-type File struct {
-	fs                FileSystem
-	rootPath          string
-	relativePath      string
-	obscureIdentifier string
-	name              string
-}
+// type File interface {
+// 	Open()
+// 	Close()
+// }
 
 // GenerateObsureId will return a random string of length = 32
 func GenerateObsureId() string {

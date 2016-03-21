@@ -106,7 +106,7 @@ func downloadHandler(w http.ResponseWriter, r *http.Request, system domain.FileS
 		http.Error(w, "Error retreiving file", http.StatusInternalServerError)
 		return
 	}
-	f.Close()
+	defer f.Close()
 
 	log.Println("Serving file: " + path)
 	_, file := filepath.Split(path)
